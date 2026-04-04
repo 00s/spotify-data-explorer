@@ -1,14 +1,15 @@
 import { ReactNode } from 'react';
-import { 
-  LayoutDashboard, 
-  Music, 
-  Mic2, 
-  ListMusic, 
-  Search, 
+import {
+  LayoutDashboard,
+  Music,
+  Mic2,
+  ListMusic,
+  Search,
   Sparkles,
   RefreshCw,
   Menu,
-  X
+  X,
+  Activity
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -23,6 +24,7 @@ const sections = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'listening', label: 'Listening History', icon: Music },
   { id: 'podcasts', label: 'Podcasts', icon: Mic2 },
+  { id: 'sessions', label: 'Sessions', icon: Activity },
   { id: 'playlists', label: 'Playlists & Library', icon: ListMusic },
   { id: 'search', label: 'Search Behavior', icon: Search },
   { id: 'wrapped', label: 'Wrapped Highlights', icon: Sparkles },

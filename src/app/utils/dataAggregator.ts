@@ -1,5 +1,7 @@
 import { ParsedData, AggregatedStats, StreamingHistoryMusic } from '../types/spotify';
 import { format, parseISO, startOfMonth, startOfDay, differenceInDays } from 'date-fns';
+import { processStreamingHistoryWithSessions } from './sessionProcessor';
+import { computeBoundariesFromCatalog } from './historyBoundaries';
 
 // Convert milliseconds to hours
 export function msToHours(ms: number): number {
@@ -82,10 +84,10 @@ export function aggregateData(data: ParsedData): AggregatedStats {
   // Aggregate top podcasts
   const podcastMap = new Map<string, { playTime: number; episodeCount: number }>();
   streamingHistoryPodcast.forEach((item) => {
-    const show = item.episode_show_name || 'Unknown Show';
+    const show = item.episode_show_name || item.podcastName || 'Unknown Show';
     const existing = podcastMap.get(show) || { playTime: 0, episodeCount: 0 };
     podcastMap.set(show, {
-      playTime: existing.playTime + item.ms_played,
+      playTime: existing.playTime + (item.ms_played || item.msPlayed || 0),
       episodeCount: existing.episodeCount + 1,
     });
   });
@@ -114,12 +116,14 @@ export function aggregateData(data: ParsedData): AggregatedStats {
 
   streamingHistoryPodcast.forEach((item) => {
     try {
-      const date = parseISO(item.ts);
+      // Handle both ISO format and "YYYY-MM-DD HH:mm" format
+      const timestamp = item.ts || item.endTime || '';
+      const date = parseISO(timestamp.replace(' ', 'T'));
       const monthKey = format(startOfMonth(date), 'yyyy-MM');
       const existing = monthMap.get(monthKey) || { musicTime: 0, podcastTime: 0 };
       monthMap.set(monthKey, {
         ...existing,
-        podcastTime: existing.podcastTime + item.ms_played,
+        podcastTime: existing.podcastTime + (item.ms_played || item.msPlayed || 0),
       });
     } catch (error) {
       // Skip invalid dates
@@ -152,13 +156,15 @@ export function aggregateData(data: ParsedData): AggregatedStats {
 
   streamingHistoryPodcast.forEach((item) => {
     try {
-      const date = parseISO(item.ts);
+      // Handle both ISO format and "YYYY-MM-DD HH:mm" format
+      const timestamp = item.ts || item.endTime || '';
+      const date = parseISO(timestamp.replace(' ', 'T'));
       if (differenceInDays(today, date) <= 90) {
         const dayKey = format(startOfDay(date), 'yyyy-MM-dd');
         const existing = dayMap.get(dayKey) || { musicTime: 0, podcastTime: 0 };
         dayMap.set(dayKey, {
           ...existing,
-          podcastTime: existing.podcastTime + item.ms_played,
+          podcastTime: existing.podcastTime + (item.ms_played || item.msPlayed || 0),
         });
       }
     } catch (error) {
@@ -170,6 +176,19 @@ export function aggregateData(data: ParsedData): AggregatedStats {
     .map(([day, stats]) => ({ day, ...stats }))
     .sort((a, b) => a.day.localeCompare(b.day));
 
+  // Process sessions for advanced temporal analysis
+  let sessionCatalog;
+  let historyBoundaries;
+  try {
+    const sessionData = processStreamingHistoryWithSessions(data);
+    sessionCatalog = sessionData.catalog;
+    historyBoundaries = computeBoundariesFromCatalog(sessionCatalog);
+  } catch (error) {
+    console.error('Error processing sessions:', error);
+    sessionCatalog = undefined;
+    historyBoundaries = undefined;
+  }
+
   return {
     totalListeningTime,
     totalListeningTimeYear,
@@ -178,6 +197,8 @@ export function aggregateData(data: ParsedData): AggregatedStats {
     topPodcasts,
     listeningByMonth,
     listeningByDay,
+    sessionCatalog,
+    historyBoundaries,
   };
 }
 

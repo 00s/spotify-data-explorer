@@ -212,9 +212,28 @@ export function combineSpotifyFiles(files: SpotifyFile[]): ParsedData {
       if (category.includes('streaming history')) {
         if (Array.isArray(content)) {
           content.forEach((item) => {
-            // Determine if it's a podcast or music based on the presence of episode fields
-            if (item.episode_name || item.episode_show_name || item.spotify_episode_uri) {
-              data.streamingHistoryPodcast.push(item);
+            // Determine if it's a podcast or music based on the presence of episode/podcast fields
+            // Check both extended format (episode_name, episode_show_name) and basic format (episodeName, podcastName)
+            const isPodcast =
+              item.episode_name ||
+              item.episode_show_name ||
+              item.spotify_episode_uri ||
+              item.episodeName ||
+              item.podcastName;
+
+            if (isPodcast) {
+              // Normalize to consistent format
+              const normalizedItem = {
+                ts: item.ts || item.endTime,
+                ms_played: item.ms_played || item.msPlayed || 0,
+                episode_name: item.episode_name || item.episodeName,
+                episode_show_name: item.episode_show_name || item.podcastName,
+                spotify_episode_uri: item.spotify_episode_uri,
+                platform: item.platform,
+                username: item.username,
+                conn_country: item.conn_country,
+              };
+              data.streamingHistoryPodcast.push(normalizedItem);
             } else {
               // It's music (or treat it as music if we can't tell)
               data.streamingHistoryMusic.push(item);

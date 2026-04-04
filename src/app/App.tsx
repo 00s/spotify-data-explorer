@@ -6,6 +6,7 @@ import { DashboardLayout } from './components/DashboardLayout';
 import { Overview } from './components/sections/Overview';
 import { ListeningHistory } from './components/sections/ListeningHistory';
 import { Podcasts } from './components/sections/Podcasts';
+import { Sessions } from './components/sections/Sessions';
 import { Playlists } from './components/sections/Playlists';
 import { SearchBehavior } from './components/sections/SearchBehavior';
 import { Wrapped } from './components/sections/Wrapped';
@@ -89,6 +90,7 @@ export default function App() {
             <ListeningHistory data={parsedData} stats={stats} />
           )}
           {activeSection === 'podcasts' && <Podcasts data={parsedData} stats={stats} />}
+          {activeSection === 'sessions' && <Sessions stats={stats} />}
           {activeSection === 'playlists' && <Playlists data={parsedData} />}
           {activeSection === 'search' && <SearchBehavior data={parsedData} />}
           {activeSection === 'wrapped' && <Wrapped data={parsedData} stats={stats} />}

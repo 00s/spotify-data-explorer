@@ -1,8 +1,9 @@
 import { ParsedData, AggregatedStats } from '../../types/spotify';
 import { formatDuration, msToHours, formatNumber } from '../../utils/dataAggregator';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Music, Headphones, Mic2, TrendingUp } from 'lucide-react';
+import { Music, Headphones, Mic2, TrendingUp, Activity } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { HistoryBoundariesCard } from '../HistoryBoundariesCard';
 
 interface OverviewProps {
   data: ParsedData;
@@ -104,6 +105,67 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* History Boundaries and Session Insights Grid */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        {/* History Boundaries */}
+        {stats.historyBoundaries && <HistoryBoundariesCard boundaries={stats.historyBoundaries} />}
+
+        {/* Session Insights */}
+        {stats.sessionCatalog && stats.sessionCatalog.totalSessions > 0 && (
+          <div className="bg-card rounded-lg border border-border p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="mb-1">Session Insights</h3>
+                <p className="text-sm text-muted-foreground">
+                  Your listening behavior analyzed by sessions
+                </p>
+              </div>
+              <button
+                onClick={() => onNavigate('sessions')}
+                className="text-sm text-primary hover:underline"
+              >
+                View details
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 bg-secondary/30 rounded-lg">
+                <Activity className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold">{formatNumber(stats.sessionCatalog.totalSessions)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total Sessions</p>
+              </div>
+              <div className="text-center p-4 bg-secondary/30 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold">
+                  {Math.round(stats.sessionCatalog.averageSessionDuration / 60)} min
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Avg. Session</p>
+              </div>
+              <div className="text-center p-4 bg-secondary/30 rounded-lg">
+                <Music className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold">
+                  {stats.sessionCatalog.longestSession
+                    ? Math.round(stats.sessionCatalog.longestSession.durationSeconds / 60)
+                    : 0}{' '}
+                  min
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Longest Session</p>
+              </div>
+              <div className="text-center p-4 bg-secondary/30 rounded-lg">
+                <Headphones className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold capitalize">
+                  {Array.from(stats.sessionCatalog.sessionsByTimeOfDay.entries()).reduce(
+                    (max, [timeOfDay, sessions]) =>
+                      sessions.length > max.count ? { timeOfDay, count: sessions.length } : max,
+                    { timeOfDay: 'morning', count: 0 }
+                  ).timeOfDay}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Peak Time</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Top Content Grid */}

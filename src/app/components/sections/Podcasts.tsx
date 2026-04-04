@@ -9,7 +9,7 @@ interface PodcastsProps {
 
 export function Podcasts({ data, stats }: PodcastsProps) {
   const totalPodcastTime = data.streamingHistoryPodcast.reduce(
-    (sum, item) => sum + item.ms_played,
+    (sum, item) => sum + (item.ms_played || item.msPlayed || 0),
     0
   );
   const totalEpisodes = data.streamingHistoryPodcast.length;
