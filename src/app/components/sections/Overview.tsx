@@ -4,6 +4,8 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { Music, Headphones, Mic2, TrendingUp, Activity } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { HistoryBoundariesCard } from '../HistoryBoundariesCard';
+import { useTimeFilter } from '../../context/TimeFilterContext';
+import { useFilteredItems, useFilteredSessions, useFilteredStats } from '../../hooks/useTimeFilteredData';
 
 interface OverviewProps {
   data: ParsedData;
@@ -12,16 +14,23 @@ interface OverviewProps {
 }
 
 export function Overview({ data, stats, onNavigate }: OverviewProps) {
-  const totalPodcastTime = data.streamingHistoryPodcast.reduce(
-    (sum, item) => sum + item.ms_played,
-    0
-  );
+  const { filter } = useTimeFilter();
+  const filteredItems = useFilteredItems(data, filter);
+  const filteredSessions = useFilteredSessions(stats, filter);
+  const filteredStats = useFilteredStats(filteredItems, filteredSessions);
 
-  // Prepare chart data (by month, simplified)
-  const chartData = stats.listeningByMonth.slice(-12).map((item) => ({
-    month: format(parseISO(item.month + '-01'), 'MMM yyyy'),
-    hours: Math.round(msToHours(item.musicTime + item.podcastTime)),
-  }));
+  const totalPodcastTime = filteredItems
+    .filter((item) => item.type === 'podcast')
+    .reduce((sum, item) => sum + (item.ms_played || item.msPlayed || 0), 0);
+
+  // Prepare chart data based on granularity
+  const chartData = filteredStats.listeningByDay.map((item) => {
+    const date = parseISO(item.day);
+    return {
+      month: format(date, filter.granularity === 'hour' ? 'HH:mm' : filter.granularity === 'day' ? 'MMM dd' : 'MMM yyyy'),
+      hours: Math.round(msToHours(item.musicTime + item.podcastTime)),
+    };
+  });
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -37,22 +46,22 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
         <StatCard
           icon={Music}
           label="Total Listening Time"
-          value={formatDuration(stats.totalListeningTime)}
-          subtitle="All time"
+          value={formatDuration(filteredStats.totalListeningTime)}
+          subtitle={filter.label}
         />
         <StatCard
-          icon={TrendingUp}
-          label="This Year"
-          value={formatDuration(stats.totalListeningTimeYear)}
-          subtitle={new Date().getFullYear().toString()}
+          icon={Activity}
+          label="Listening Sessions"
+          value={filteredSessions.length.toString()}
+          subtitle={`${filteredItems.length} items played`}
         />
         <StatCard
           icon={Headphones}
           label="Top Artist"
-          value={stats.topArtists[0]?.name || 'N/A'}
+          value={filteredStats.topArtists[0]?.name || 'N/A'}
           subtitle={
-            stats.topArtists[0]
-              ? `${formatNumber(stats.topArtists[0].playCount)} plays`
+            filteredStats.topArtists[0]
+              ? `${formatNumber(filteredStats.topArtists[0].playCount)} plays`
               : ''
           }
         />
@@ -60,7 +69,7 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
           icon={Mic2}
           label="Podcast Time"
           value={formatDuration(totalPodcastTime)}
-          subtitle={`${stats.topPodcasts.length} shows`}
+          subtitle={`${filteredStats.topPodcasts.length} shows`}
         />
       </div>
 
@@ -113,7 +122,7 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
         {stats.historyBoundaries && <HistoryBoundariesCard boundaries={stats.historyBoundaries} />}
 
         {/* Session Insights */}
-        {stats.sessionCatalog && stats.sessionCatalog.totalSessions > 0 && (
+        {filteredSessions.length > 0 && (
           <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -132,22 +141,27 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-4 bg-secondary/30 rounded-lg">
                 <Activity className="w-6 h-6 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold">{formatNumber(stats.sessionCatalog.totalSessions)}</p>
+                <p className="text-2xl font-bold">{formatNumber(filteredSessions.length)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Total Sessions</p>
               </div>
               <div className="text-center p-4 bg-secondary/30 rounded-lg">
                 <TrendingUp className="w-6 h-6 text-primary mx-auto mb-2" />
                 <p className="text-2xl font-bold">
-                  {Math.round(stats.sessionCatalog.averageSessionDuration / 60)} min
+                  {Math.round(
+                    filteredSessions.reduce((sum, s) => sum + s.durationSeconds, 0) /
+                      filteredSessions.length /
+                      60
+                  )}{' '}
+                  min
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Avg. Session</p>
               </div>
               <div className="text-center p-4 bg-secondary/30 rounded-lg">
                 <Music className="w-6 h-6 text-primary mx-auto mb-2" />
                 <p className="text-2xl font-bold">
-                  {stats.sessionCatalog.longestSession
-                    ? Math.round(stats.sessionCatalog.longestSession.durationSeconds / 60)
-                    : 0}{' '}
+                  {Math.round(
+                    Math.max(...filteredSessions.map((s) => s.durationSeconds)) / 60
+                  )}{' '}
                   min
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Longest Session</p>
@@ -155,11 +169,18 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
               <div className="text-center p-4 bg-secondary/30 rounded-lg">
                 <Headphones className="w-6 h-6 text-primary mx-auto mb-2" />
                 <p className="text-2xl font-bold capitalize">
-                  {Array.from(stats.sessionCatalog.sessionsByTimeOfDay.entries()).reduce(
-                    (max, [timeOfDay, sessions]) =>
-                      sessions.length > max.count ? { timeOfDay, count: sessions.length } : max,
-                    { timeOfDay: 'morning', count: 0 }
-                  ).timeOfDay}
+                  {(() => {
+                    const byTime = filteredSessions.reduce(
+                      (acc, s) => {
+                        acc[s.timeOfDay] = (acc[s.timeOfDay] || 0) + 1;
+                        return acc;
+                      },
+                      {} as Record<string, number>
+                    );
+                    return (
+                      Object.entries(byTime).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'
+                    );
+                  })()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Peak Time</p>
               </div>
@@ -182,7 +203,7 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
             </button>
           </div>
           <div className="space-y-3">
-            {stats.topArtists.slice(0, 5).map((artist, idx) => (
+            {filteredStats.topArtists.slice(0, 5).map((artist, idx) => (
               <div key={idx} className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
                   {idx + 1}
@@ -210,7 +231,7 @@ export function Overview({ data, stats, onNavigate }: OverviewProps) {
             </button>
           </div>
           <div className="space-y-3">
-            {stats.topTracks.slice(0, 5).map((track, idx) => (
+            {filteredStats.topTracks.slice(0, 5).map((track, idx) => (
               <div key={idx} className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
                   {idx + 1}

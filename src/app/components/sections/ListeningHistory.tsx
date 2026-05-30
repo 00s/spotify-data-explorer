@@ -4,6 +4,8 @@ import { formatDuration, formatNumber } from '../../utils/dataAggregator';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useTimeFilter } from '../../context/TimeFilterContext';
+import { useFilteredItems, useFilteredSessions, useFilteredStats } from '../../hooks/useTimeFilteredData';
 
 interface ListeningHistoryProps {
   data: ParsedData;
@@ -11,19 +13,18 @@ interface ListeningHistoryProps {
 }
 
 export function ListeningHistory({ data, stats }: ListeningHistoryProps) {
+  const { filter } = useTimeFilter();
+  const filteredItems = useFilteredItems(data, filter);
+  const filteredSessions = useFilteredSessions(stats, filter);
+  const filteredStats = useFilteredStats(filteredItems, filteredSessions);
+
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'day' | 'month'>('month');
 
-  const chartData =
-    viewMode === 'month'
-      ? stats.listeningByMonth.slice(-12).map((item) => ({
-          label: format(parseISO(item.month + '-01'), 'MMM yy'),
-          hours: Math.round((item.musicTime / (1000 * 60 * 60)) * 10) / 10,
-        }))
-      : stats.listeningByDay.slice(-30).map((item) => ({
-          label: format(parseISO(item.day), 'MMM d'),
-          hours: Math.round((item.musicTime / (1000 * 60 * 60)) * 10) / 10,
-        }));
+  const chartData = filteredStats.listeningByDay.map((item) => ({
+    label: format(parseISO(item.day), filter.granularity === 'day' ? 'MMM d' : 'MMM yy'),
+    hours: Math.round((item.musicTime / (1000 * 60 * 60)) * 10) / 10,
+  }));
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -123,7 +124,7 @@ export function ListeningHistory({ data, stats }: ListeningHistoryProps) {
         <div className="bg-card rounded-lg border border-border p-6">
           <h3 className="mb-4">Top Artists</h3>
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {stats.topArtists.slice(0, 20).map((artist, idx) => (
+            {filteredStats.topArtists.slice(0, 20).map((artist, idx) => (
               <div key={idx} className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
                   {idx + 1}
@@ -143,7 +144,7 @@ export function ListeningHistory({ data, stats }: ListeningHistoryProps) {
         <div className="bg-card rounded-lg border border-border p-6">
           <h3 className="mb-4">Top Tracks</h3>
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {stats.topTracks.slice(0, 20).map((track, idx) => (
+            {filteredStats.topTracks.slice(0, 20).map((track, idx) => (
               <div key={idx} className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
                   {idx + 1}

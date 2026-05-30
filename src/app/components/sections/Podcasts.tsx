@@ -1,6 +1,8 @@
 import { ParsedData, AggregatedStats } from '../../types/spotify';
 import { formatDuration, formatNumber } from '../../utils/dataAggregator';
 import { Mic2, MessageSquare, ThumbsUp } from 'lucide-react';
+import { useTimeFilter } from '../../context/TimeFilterContext';
+import { useFilteredItems, useFilteredStats } from '../../hooks/useTimeFilteredData';
 
 interface PodcastsProps {
   data: ParsedData;
@@ -8,11 +10,16 @@ interface PodcastsProps {
 }
 
 export function Podcasts({ data, stats }: PodcastsProps) {
-  const totalPodcastTime = data.streamingHistoryPodcast.reduce(
+  const { filter } = useTimeFilter();
+  const filteredItems = useFilteredItems(data, filter);
+  const filteredStats = useFilteredStats(filteredItems, []);
+
+  const podcastItems = filteredItems.filter((item) => item.type === 'podcast');
+  const totalPodcastTime = podcastItems.reduce(
     (sum, item) => sum + (item.ms_played || item.msPlayed || 0),
     0
   );
-  const totalEpisodes = data.streamingHistoryPodcast.length;
+  const totalEpisodes = podcastItems.length;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -40,16 +47,16 @@ export function Podcasts({ data, stats }: PodcastsProps) {
         <div className="bg-card rounded-lg border border-border p-6">
           <ThumbsUp className="w-8 h-8 text-primary mb-3" />
           <p className="text-sm text-muted-foreground mb-1">Shows Followed</p>
-          <p className="text-2xl font-bold">{stats.topPodcasts.length}</p>
+          <p className="text-2xl font-bold">{filteredStats.topPodcasts.length}</p>
         </div>
       </div>
 
       {/* Top Shows */}
-      {stats.topPodcasts.length > 0 ? (
+      {filteredStats.topPodcasts.length > 0 ? (
         <div className="bg-card rounded-lg border border-border p-6 mb-8">
           <h3 className="mb-4">Top Shows</h3>
           <div className="space-y-3">
-            {stats.topPodcasts.map((podcast, idx) => (
+            {filteredStats.topPodcasts.map((podcast, idx) => (
               <div key={idx} className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/30 transition-colors">
                 <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center font-bold text-primary flex-shrink-0">
                   {idx + 1}

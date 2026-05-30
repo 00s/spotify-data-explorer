@@ -189,10 +189,31 @@ export interface HistoryBoundaries {
 }
 
 export interface TimeFilter {
-  mode: 'day' | 'week' | 'month' | 'year' | 'all' | 'custom';
+  mode: 'day' | 'week' | 'month' | 'year' | 'season' | 'all' | 'custom';
   startDate: Date;
   endDate: Date;
   label: string;
+}
+
+export type TimeFilterPreset =
+  | 'today'
+  | 'yesterday'
+  | 'this-week'
+  | 'last-week'
+  | 'this-month'
+  | 'last-month'
+  | 'this-year'
+  | 'last-year'
+  | 'this-season'
+  | 'last-season'
+  | 'all-time'
+  | 'custom';
+
+export interface TimeFilterState extends TimeFilter {
+  preset: TimeFilterPreset;
+  granularity: 'hour' | 'day' | 'week' | 'month' | 'year';
+  canNavigateBack: boolean;
+  canNavigateForward: boolean;
 }
 
 // Unified streaming item (music or podcast)

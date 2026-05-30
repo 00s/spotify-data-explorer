@@ -12,6 +12,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useState } from 'react';
+import { TimeFilterBar } from './TimeFilterBar';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -142,7 +143,10 @@ export function DashboardLayout({
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto pt-16 md:pt-0">
-        {children}
+        <TimeFilterBar />
+        <div className="p-6">
+          {children}
+        </div>
       </main>
     </div>
   );

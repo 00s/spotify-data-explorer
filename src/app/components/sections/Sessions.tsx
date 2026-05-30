@@ -6,6 +6,8 @@ import {
   getTimeOfDayBreakdown,
 } from '../../utils/sessionProcessor';
 import { Activity, Clock, BarChart3, TrendingUp } from 'lucide-react';
+import { useTimeFilter } from '../../context/TimeFilterContext';
+import { useFilteredSessions } from '../../hooks/useTimeFilteredData';
 import {
   BarChart,
   Bar,
@@ -25,13 +27,18 @@ interface SessionsProps {
 }
 
 export function Sessions({ stats }: SessionsProps) {
-  if (!stats.sessionCatalog) {
+  const { filter } = useTimeFilter();
+  const filteredSessions = useFilteredSessions(stats, filter);
+
+  if (!stats.sessionCatalog || filteredSessions.length === 0) {
     return (
       <div className="p-6 md:p-8 max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="mb-2">Listening Sessions</h1>
           <p className="text-muted-foreground">
-            Session analysis is not available for this dataset
+            {!stats.sessionCatalog
+              ? 'Session analysis is not available for this dataset'
+              : 'No sessions in the selected time range'}
           </p>
         </div>
         <div className="bg-card rounded-lg border border-border p-12 text-center">
@@ -42,10 +49,37 @@ export function Sessions({ stats }: SessionsProps) {
     );
   }
 
-  const { sessionCatalog, historyBoundaries } = stats;
-  const hourlyPattern = getHourlyListeningPattern(sessionCatalog);
-  const lengthDistribution = getSessionLengthDistribution(sessionCatalog);
-  const timeOfDayBreakdown = getTimeOfDayBreakdown(sessionCatalog);
+  const { historyBoundaries } = stats;
+
+  // Build sessionsByHour map so getHourlyListeningPattern has real data
+  const sessionsByHour = new Map<number, typeof filteredSessions>();
+  filteredSessions.forEach((s) => {
+    const hour = new Date(s.startTimestamp * 1000).getHours();
+    const bucket = sessionsByHour.get(hour) ?? [];
+    bucket.push(s);
+    sessionsByHour.set(hour, bucket);
+  });
+
+  // Create filtered session catalog
+  const filteredCatalog = {
+    sessions: filteredSessions,
+    totalSessions: filteredSessions.length,
+    averageSessionDuration:
+      filteredSessions.reduce((sum, s) => sum + s.durationSeconds, 0) /
+      (filteredSessions.length || 1),
+    longestSession: filteredSessions.reduce(
+      (max, s) => (s.durationSeconds > (max?.durationSeconds || 0) ? s : max),
+      filteredSessions[0]
+    ),
+    sessionsByDate: new Map(),
+    sessionsByDayOfWeek: new Map(),
+    sessionsByHour,
+    sessionsByTimeOfDay: new Map(),
+  };
+
+  const hourlyPattern = getHourlyListeningPattern(filteredCatalog);
+  const lengthDistribution = getSessionLengthDistribution(filteredCatalog);
+  const timeOfDayBreakdown = getTimeOfDayBreakdown(filteredCatalog);
 
   // Prepare data for charts
   const hourlyChartData = hourlyPattern.map((item) => ({
@@ -67,9 +101,9 @@ export function Sessions({ stats }: SessionsProps) {
     'Podcasts (hours)': Math.round(item.podcastTime / 3600),
   }));
 
-  const avgSessionMinutes = Math.round(sessionCatalog.averageSessionDuration / 60);
-  const longestSessionMinutes = sessionCatalog.longestSession
-    ? Math.round(sessionCatalog.longestSession.durationSeconds / 60)
+  const avgSessionMinutes = Math.round(filteredCatalog.averageSessionDuration / 60);
+  const longestSessionMinutes = filteredCatalog.longestSession
+    ? Math.round(filteredCatalog.longestSession.durationSeconds / 60)
     : 0;
 
   return (
@@ -91,7 +125,7 @@ export function Sessions({ stats }: SessionsProps) {
         <div className="bg-card rounded-lg border border-border p-6">
           <Activity className="w-8 h-8 text-primary mb-3" />
           <p className="text-sm text-muted-foreground mb-1">Total Sessions</p>
-          <p className="text-2xl font-bold">{formatNumber(sessionCatalog.totalSessions)}</p>
+          <p className="text-2xl font-bold">{formatNumber(filteredCatalog.totalSessions)}</p>
         </div>
 
         <div className="bg-card rounded-lg border border-border p-6">
@@ -110,10 +144,10 @@ export function Sessions({ stats }: SessionsProps) {
           <BarChart3 className="w-8 h-8 text-primary mb-3" />
           <p className="text-sm text-muted-foreground mb-1">Items per Session</p>
           <p className="text-2xl font-bold">
-            {sessionCatalog.totalSessions > 0
+            {filteredCatalog.totalSessions > 0
               ? Math.round(
-                  sessionCatalog.sessions.reduce((sum, s) => sum + s.itemCount, 0) /
-                    sessionCatalog.totalSessions
+                  filteredCatalog.sessions.reduce((sum, s) => sum + s.itemCount, 0) /
+                    filteredCatalog.totalSessions
                 )
               : 0}
           </p>
@@ -211,11 +245,11 @@ export function Sessions({ stats }: SessionsProps) {
       </div>
 
       {/* Recent Sessions */}
-      {sessionCatalog.sessions.length > 0 && (
+      {filteredCatalog.sessions.length > 0 && (
         <div className="bg-card rounded-lg border border-border p-6">
           <h3 className="mb-4">Recent Sessions</h3>
           <div className="space-y-3">
-            {sessionCatalog.sessions
+            {filteredCatalog.sessions
               .sort((a, b) => b.startTimestamp - a.startTimestamp)
               .slice(0, 10)
               .map((session, idx) => (

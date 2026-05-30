@@ -13,6 +13,7 @@ import { Wrapped } from './components/sections/Wrapped';
 import { SpotifyFile, ParsedData, AggregatedStats } from './types/spotify';
 import { combineSpotifyFiles } from './utils/fileParser';
 import { aggregateData } from './utils/dataAggregator';
+import { TimeFilterProvider } from './context/TimeFilterContext';
 
 type AppState = 'privacy' | 'upload' | 'select' | 'dashboard';
 
@@ -78,23 +79,25 @@ export default function App() {
       )}
 
       {appState === 'dashboard' && parsedData && stats && (
-        <DashboardLayout
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          onClearData={handleClearData}
-        >
-          {activeSection === 'overview' && (
-            <Overview data={parsedData} stats={stats} onNavigate={setActiveSection} />
-          )}
-          {activeSection === 'listening' && (
-            <ListeningHistory data={parsedData} stats={stats} />
-          )}
-          {activeSection === 'podcasts' && <Podcasts data={parsedData} stats={stats} />}
-          {activeSection === 'sessions' && <Sessions stats={stats} />}
-          {activeSection === 'playlists' && <Playlists data={parsedData} />}
-          {activeSection === 'search' && <SearchBehavior data={parsedData} />}
-          {activeSection === 'wrapped' && <Wrapped data={parsedData} stats={stats} />}
-        </DashboardLayout>
+        <TimeFilterProvider data={parsedData} stats={stats}>
+          <DashboardLayout
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            onClearData={handleClearData}
+          >
+            {activeSection === 'overview' && (
+              <Overview data={parsedData} stats={stats} onNavigate={setActiveSection} />
+            )}
+            {activeSection === 'listening' && (
+              <ListeningHistory data={parsedData} stats={stats} />
+            )}
+            {activeSection === 'podcasts' && <Podcasts data={parsedData} stats={stats} />}
+            {activeSection === 'sessions' && <Sessions stats={stats} />}
+            {activeSection === 'playlists' && <Playlists data={parsedData} />}
+            {activeSection === 'search' && <SearchBehavior data={parsedData} />}
+            {activeSection === 'wrapped' && <Wrapped data={parsedData} stats={stats} />}
+          </DashboardLayout>
+        </TimeFilterProvider>
       )}
     </div>
   );
